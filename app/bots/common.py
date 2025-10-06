@@ -51,8 +51,8 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📣 Чаты/Каналы", callback_data="child:chats")],
         [
-            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:hello"),
-            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:bye"),
+            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:greet:open:hello"),
+            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:greet:open:bye"),
         ],
         [
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="child:settings"),
@@ -62,23 +62,35 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     ])
 
 
-def channels_list_kb(items: List[Dict[str, Any]], page: int = 1) -> InlineKeyboardMarkup:
+def greet_editor_kb(kind: str) -> InlineKeyboardMarkup:
     """
-    Клавиатура для экрана «Чаты/Каналы».
-    На каждую запись — две кнопки: название и удалить.
-    Внизу: «Подключить чат» и «В меню».
+    kind: 'hello' | 'bye'
     """
-    rows: list[list[InlineKeyboardButton]] = []
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✏️ Текст", callback_data=f"child:greet:edit:text:{kind}"),
+            InlineKeyboardButton(text="🖼️ Фото", callback_data=f"child:greet:set:photo:{kind}"),
+        ],
+        [
+            InlineKeyboardButton(text="🎬 Видео", callback_data=f"child:greet:set:video:{kind}"),
+            InlineKeyboardButton(text="🔵 Кружок", callback_data=f"child:greet:set:videonote:{kind}"),
+        ],
+        [
+            InlineKeyboardButton(text="🔘 Кнопка", callback_data=f"child:greet:btn:{kind}"),
+            InlineKeyboardButton(text="🧽 Очистить медиа", callback_data=f"child:greet:clear_media:{kind}"),
+        ],
+        [InlineKeyboardButton(text="👁️ Предпросмотр", callback_data=f"child:greet:preview:{kind}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="child:back")],
+    ])
 
-    if items:
-        for r in items:
-            label = f"{r.get('title') or r['chat_id']}"
-            rows.append([InlineKeyboardButton(text=label, callback_data=f"child:ch:{r['id']}")])
-            rows.append([InlineKeyboardButton(text="🗑 Удалить", callback_data=f"child:chdel:{r['id']}")])
-    else:
-        rows.append([InlineKeyboardButton(text="Нет подключённых", callback_data="noop")])
 
-    rows.append([InlineKeyboardButton(text="🔗 Подключить чат", callback_data="child:chadd")])
-    rows.append([InlineKeyboardButton(text="↩︎ В меню", callback_data="child:back")])
+def greet_button_kb(kind: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🚀 Deep-link START", callback_data=f"child:greet:btn:set_start:{kind}"),
+            InlineKeyboardButton(text="🔗 URL",             callback_data=f"child:greet:btn:set_url:{kind}"),
+        ],
+        [InlineKeyboardButton(text="❌ Убрать кнопку", callback_data=f"child:greet:btn:clear:{kind}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"child:greet:open:{kind}")],
+    ])
 
-    return InlineKeyboardMarkup(inline_keyboard=rows)
