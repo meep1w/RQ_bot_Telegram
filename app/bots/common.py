@@ -1,7 +1,9 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from typing import List, Dict, Any
-from typing import Optional
+from typing import Any, Dict, List
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+# ====== GA (главный бот) ======
 
 def ga_main_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -16,7 +18,7 @@ def ga_main_kb() -> InlineKeyboardMarkup:
 def ga_clients_kb(items: List[Dict[str, Any]], page: int, has_prev: bool, has_next: bool) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Кнопки-строки со списком клиентов
+    # Строки-кнопки со списком клиентов
     for r in items:
         owner_label = f"@{r.get('owner_username') or r['owner_user_id']}"
         rows.append([InlineKeyboardButton(text=owner_label, callback_data=f"ga:tenant:{r['id']}:open:{page}")])
@@ -43,7 +45,8 @@ def tenant_card_kb(tenant_id: int, page_back: int) -> InlineKeyboardMarkup:
     ])
 
 
-# Детский бот — админ-меню
+# ====== Детский бот ======
+
 def child_admin_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📣 Чаты/Каналы", callback_data="child:chats")],
@@ -59,8 +62,14 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     ])
 
 
-def channels_list_kb(items: list[dict], page: int = 1) -> InlineKeyboardMarkup:
+def channels_list_kb(items: List[Dict[str, Any]], page: int = 1) -> InlineKeyboardMarkup:
+    """
+    Клавиатура для экрана «Чаты/Каналы».
+    На каждую запись — две кнопки: название и удалить.
+    Внизу: «Подключить чат» и «В меню».
+    """
     rows: list[list[InlineKeyboardButton]] = []
+
     if items:
         for r in items:
             label = f"{r.get('title') or r['chat_id']}"
@@ -71,4 +80,5 @@ def channels_list_kb(items: list[dict], page: int = 1) -> InlineKeyboardMarkup:
 
     rows.append([InlineKeyboardButton(text="🔗 Подключить чат", callback_data="child:chadd")])
     rows.append([InlineKeyboardButton(text="↩︎ В меню", callback_data="child:back")])
+
     return InlineKeyboardMarkup(inline_keyboard=rows)
