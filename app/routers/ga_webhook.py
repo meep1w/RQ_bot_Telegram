@@ -13,6 +13,6 @@ _dp.include_router(ga_bot.router)
 @router.post("/webhook/ga")
 async def webhook_ga(request: Request):
     data = await request.json()
-    update = Update.model_validate(data)
+    update = Update.model_validate(data)  # <-- v3: корректный парсинг апдейта
     await _dp.feed_update(_bot, update)
     return Response(status_code=200)
