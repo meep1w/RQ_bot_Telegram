@@ -39,3 +39,15 @@ async def delete_channel(tenant_id: int, channel_id: int) -> None:
         await c.execute("DELETE FROM channels WHERE id=$1 AND tenant_id=$2", channel_id, tenant_id)
     finally:
         await c.close()
+
+# добавь в конец файла:
+async def is_tenant_chat(tenant_id: int, chat_id: int) -> bool:
+    c = await _conn()
+    try:
+        row = await c.fetchrow(
+            "SELECT 1 FROM channels WHERE tenant_id=$1 AND chat_id=$2",
+            tenant_id, chat_id,
+        )
+        return bool(row)
+    finally:
+        await c.close()
