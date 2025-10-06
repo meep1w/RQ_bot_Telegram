@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from typing import List, Dict, Any
+from typing import Optional
 
 
 def ga_main_kb() -> InlineKeyboardMarkup:
@@ -56,3 +57,18 @@ def child_admin_kb() -> InlineKeyboardMarkup:
         ],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="child:stats")],
     ])
+
+
+def channels_list_kb(items: list[dict], page: int = 1) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if items:
+        for r in items:
+            label = f"{r.get('title') or r['chat_id']}"
+            rows.append([InlineKeyboardButton(text=label, callback_data=f"child:ch:{r['id']}")])
+            rows.append([InlineKeyboardButton(text="🗑 Удалить", callback_data=f"child:chdel:{r['id']}")])
+    else:
+        rows.append([InlineKeyboardButton(text="Нет подключённых", callback_data="noop")])
+
+    rows.append([InlineKeyboardButton(text="🔗 Подключить чат", callback_data="child:chadd")])
+    rows.append([InlineKeyboardButton(text="↩︎ В меню", callback_data="child:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
