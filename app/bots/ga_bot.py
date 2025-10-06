@@ -29,31 +29,42 @@ async def start(msg: Message, bot: Bot):
 
 @router.message(F.text.regexp(r"^\d{9,10}:[A-Za-z0-9_-]{35,}$"))
 async def connect_child(msg: Message, bot: Bot):
-    """
-    Принимаем API-token детского бота, создаём/обновляем тенанта,
-    ставим вебхук детскому боту и отвечаем с его @username.
-    """
     uid = msg.from_user.id
     if not await is_in_group(bot, uid):
         return await msg.answer("Ты не в приватке. Напиши @toffadds.")
 
     token = msg.text.strip()
+    note = await msg.answer("✅ Токен получен. Создаю запись клиента…")
 
-    # Создаём/обновляем запись тенанта и выдаём новый секрет вебхука
-    tenant_id, secret = await upsert_tenant(uid, msg.from_user.username, token)
+    try:
+        # 1) БД
+        tenant_id, secret = await upsert_tenant(uid, msg.from_user.username, token)
+        await note.edit_text(f"🗄 Запись создана (tenant_id={tenant_id}). Проверяю бота…")
 
-    # Получим username детского бота и сохраним его
-    cbot = Bot(token)
-    me = await cbot.get_me()
-    await save_bot_username(tenant_id, me.username)
+        # 2) Проверка токена детского бота
+        cbot = Bot(token)
+        me = await cbot.get_me()
+        await save_bot_username(tenant_id, me.username)
+        await note.edit_text(f"🤖 Найдён бот @{me.username}. Ставлю вебхук…")
 
-    # Ставим вебхук для детского бота
-    await set_child_webhook(cbot, tenant_id, secret)
-
-    await msg.answer(
-        f"Ваш бот успешно подключён! Перейдите к нему и завершите настройку: @{me.username}"
-    )
-
+        # 3) Вебхук детскому боту
+        await set_child_webhook(cbot, tenant_id, secret)
+        await msg.answer(
+            f"✅ Ваш бот подключён! Перейдите к нему и завершите настройку: @{me.username}"
+        )
+    except Exception as e:
+        # Покажем причину прямо в чате и отдадим подсказки
+        text = str(e)
+        await msg.answer(
+            "❌ Ошибка при подключении бота.\n"
+            f"`{text}`\n\n"
+            "Проверь в .env:\n"
+            "• DATABASE_URL (пример: postgresql+asyncpg://multibot:multibot_pass@127.0.0.1:5432/multibot)\n"
+            "• WEB_BASE=https://62.60.216.184\n"
+            "И что бот добавлен админом в группу с одобрением заявок.",
+            parse_mode="Markdown",
+        )
+        raise
 
 @router.message(Command("deploy"))
 async def deploy(msg: Message):
