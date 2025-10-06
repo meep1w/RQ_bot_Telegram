@@ -10,6 +10,7 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from aiogram.exceptions import TelegramForbiddenError
+from aiogram.enums import ParseMode
 
 from app.bots.common import (
     child_admin_kb, channels_list_kb,
@@ -23,16 +24,22 @@ from app.services.greetings_simple import (
 
 router = Router()
 
-# ------- helpers -------
+
+# ===================== helpers =====================
 
 async def _send_greeting_dm(bot: Bot, user_id: int, tenant_id: int, kind: str) -> Optional[int]:
+    """
+    Отправляет пользователю ЛС с приветствием/прощанием согласно настройкам.
+    Возвращает message_id первого отправленного сообщения (для автоудаления в превью).
+    """
     g = await get_greeting(tenant_id, kind)
     if not g:
         return None
 
     text = g.get("text") or ("Добро пожаловать!" if kind == "hello" else "До встречи!")
-    kb: Optional[InlineKeyboardMarkup] = None
 
+    # Кнопка
+    kb: Optional[InlineKeyboardMarkup] = None
     if g.get("button_text"):
         if (g.get("button_kind") or "start") == "start":
             me = await bot.get_me()
@@ -47,25 +54,65 @@ async def _send_greeting_dm(bot: Bot, user_id: int, tenant_id: int, kind: str) -
             ])
 
     try:
+        # Фото с подписью
         if g.get("photo_file_id"):
-            m = await bot.send_photo(user_id, g["photo_file_id"], caption=text, reply_markup=kb)
+            m = await bot.send_photo(
+                user_id,
+                g["photo_file_id"],
+                caption=text or None,
+                reply_markup=kb,
+                parse_mode=ParseMode.HTML,
+                disable_notification=True,
+                disable_web_page_preview=True,
+            )
             return m.message_id
+
+        # Кружок (видео-нота). Текст добьём отдельным сообщением.
         if g.get("video_note_file_id"):
             m = await bot.send_video_note(user_id, g["video_note_file_id"])
-            await bot.send_message(user_id, text, reply_markup=kb)
+            await bot.send_message(
+                user_id,
+                text or " ",
+                reply_markup=kb,
+                parse_mode=ParseMode.HTML,
+                disable_notification=True,
+                disable_web_page_preview=True,
+            )
             return m.message_id
+
+        # Видео с подписью
         if g.get("video_file_id"):
-            m = await bot.send_video(user_id, g["video_file_id"], caption=text, reply_markup=kb)
+            m = await bot.send_video(
+                user_id,
+                g["video_file_id"],
+                caption=text or None,
+                reply_markup=kb,
+                parse_mode=ParseMode.HTML,
+                disable_notification=True,
+                disable_web_page_preview=True,
+            )
             return m.message_id
-        m = await bot.send_message(user_id, text, reply_markup=kb)
+
+        # Только текст
+        m = await bot.send_message(
+            user_id,
+            text or " ",
+            reply_markup=kb,
+            parse_mode=ParseMode.HTML,
+            disable_notification=True,
+            disable_web_page_preview=True,
+        )
         return m.message_id
+
     except TelegramForbiddenError:
+        # Пользователь никогда не жмал START у этого бота
         return None
 
 
 async def _render_greet_editor(cb: CallbackQuery, tenant_id: int, kind: str):
     g = await get_greeting(tenant_id, kind)
     title = "👋 Приветствие" if kind == "hello" else "🧹 Прощание"
+
     lines = [title, ""]
     if g:
         lines.append(f"Текст: {g.get('text') or '—'}")
@@ -80,10 +127,11 @@ async def _render_greet_editor(cb: CallbackQuery, tenant_id: int, kind: str):
             lines.append(f"Кнопка: «{g['button_text']}» → {kind_txt}")
     else:
         lines.append("Пока пусто. Нажми «Текст»/«Фото» и т.д.")
+
     await cb.message.edit_text("\n".join(lines), reply_markup=greet_editor_kb(kind))
 
 
-# ------- /admin -------
+# ===================== /admin =====================
 
 @router.message(Command("admin"))
 async def admin_root(msg: Message, tenant: dict):
@@ -100,7 +148,7 @@ async def admin_back(cb: CallbackQuery, tenant: dict):
     await cb.answer()
 
 
-# ------- Чаты/каналы -------
+# ===================== Чаты/каналы =====================
 
 @router.callback_query(F.data == "child:chats")
 async def chats_open(cb: CallbackQuery, tenant: dict):
@@ -108,7 +156,9 @@ async def chats_open(cb: CallbackQuery, tenant: dict):
         return await cb.answer()
     items = await list_channels(tenant["id"])
     await cb.message.edit_text(
-        "📣 Чаты/Каналы\nДобавь бота админом в канале/чате.\nВременно можно привязать по ID: отправь в бота `+chat <ID>`.",
+        "📣 Чаты/Каналы\n"
+        "Добавь бота админом в канале/чате.\n"
+        "Временно можно привязать по ID: отправь в бота `+chat <ID>`.",
         reply_markup=channels_list_kb(items),
         parse_mode="Markdown",
     )
@@ -135,7 +185,7 @@ async def chats_del(cb: CallbackQuery, tenant: dict):
     await cb.answer("Удалено")
 
 
-# ------- Приветствие/прощание: вход в редактор -------
+# ======= Приветствие/прощание: вход в редактор =======
 
 @router.callback_query(F.data.in_({"child:hello", "child:bye"}))
 async def greet_root(cb: CallbackQuery, tenant: dict):
@@ -146,7 +196,7 @@ async def greet_root(cb: CallbackQuery, tenant: dict):
     await cb.answer()
 
 
-# ------- Предпросмотр -------
+# ===================== Предпросмотр =====================
 
 @router.callback_query(F.data.startswith("child:greet:preview:"))
 async def greet_preview(cb: CallbackQuery, tenant: dict, bot: Bot):
@@ -155,18 +205,23 @@ async def greet_preview(cb: CallbackQuery, tenant: dict, bot: Bot):
     kind = cb.data.split(":")[-1]
     mid = await _send_greeting_dm(bot, cb.from_user.id, tenant["id"], kind)
     if mid is None:
-        return await cb.answer("Не могу написать в ЛС: пользователь не нажимал START у этого бота.", show_alert=True)
+        return await cb.answer(
+            "Не могу написать в ЛС: пользователь не нажимал START у этого бота.",
+            show_alert=True,
+        )
+
     async def _autodel():
         await asyncio.sleep(10)
         try:
             await bot.delete_message(cb.from_user.id, mid)
         except Exception:
             pass
+
     asyncio.create_task(_autodel())
     await cb.answer("Отправил превью в ЛС (удалю через ~10 сек).")
 
 
-# ------- Редактирование текста -------
+# ===================== Редактирование текста =====================
 
 @router.callback_query(F.data.startswith("child:greet:edit:text:"))
 async def greet_edit_text(cb: CallbackQuery, tenant: dict):
@@ -181,16 +236,16 @@ async def greet_edit_text(cb: CallbackQuery, tenant: dict):
         parse_mode="Markdown",
     )
 
-    @router.message(F.chat.id == cb.message.chat.id)
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id)
     async def _catch(msg: Message):
         new_text = None if (msg.text or "").strip() == "-" else msg.text
         await set_text(tenant["id"], kind, new_text or "")
         await msg.answer("Сохранено.")
         await _render_greet_editor(cb, tenant["id"], kind)
-        router.message.handlers.pop()  # один раз
+        router.message.handlers.pop()  # снять временный хэндлер
 
 
-# ------- Медиа -------
+# ===================== Медиа =====================
 
 @router.callback_query(F.data.startswith("child:greet:set:photo:"))
 async def greet_set_photo(cb: CallbackQuery, tenant: dict):
@@ -202,16 +257,17 @@ async def greet_set_photo(cb: CallbackQuery, tenant: dict):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="↩️ Отмена", callback_data=f"child:greet:open:{kind}")]
         ]),
+        parse_mode="Markdown",
     )
 
-    @router.message(F.photo)
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.photo)
     async def _cap(msg: Message):
         await set_photo(tenant["id"], kind, msg.photo[-1].file_id)
         await msg.answer("Фото сохранено.")
         await _render_greet_editor(cb, tenant["id"], kind)
         router.message.handlers.pop()
 
-    @router.message(F.text == "-")
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.text == "-")
     async def _clr(msg: Message):
         await clear_media(tenant["id"], kind)
         await msg.answer("Медиа очищено.")
@@ -229,16 +285,17 @@ async def greet_set_video(cb: CallbackQuery, tenant: dict):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="↩️ Отмена", callback_data=f"child:greet:open:{kind}")]
         ]),
+        parse_mode="Markdown",
     )
 
-    @router.message(F.video)
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.video)
     async def _cap(msg: Message):
         await set_video(tenant["id"], kind, msg.video.file_id)
         await msg.answer("Видео сохранено.")
         await _render_greet_editor(cb, tenant["id"], kind)
         router.message.handlers.pop()
 
-    @router.message(F.text == "-")
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.text == "-")
     async def _clr(msg: Message):
         await clear_media(tenant["id"], kind)
         await msg.answer("Медиа очищено.")
@@ -256,16 +313,17 @@ async def greet_set_vn(cb: CallbackQuery, tenant: dict):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="↩️ Отмена", callback_data=f"child:greet:open:{kind}")]
         ]),
+        parse_mode="Markdown",
     )
 
-    @router.message(F.video_note)
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.video_note)
     async def _cap(msg: Message):
         await set_video_note(tenant["id"], kind, msg.video_note.file_id)
         await msg.answer("Кружок сохранён.")
         await _render_greet_editor(cb, tenant["id"], kind)
         router.message.handlers.pop()
 
-    @router.message(F.text == "-")
+    @router.message(F.chat.id == cb.message.chat.id, F.from_user.id == cb.from_user.id, F.text == "-")
     async def _clr(msg: Message):
         await clear_media(tenant["id"], kind)
         await msg.answer("Медиа очищено.")
@@ -283,7 +341,7 @@ async def greet_clear_media(cb: CallbackQuery, tenant: dict):
     await cb.answer("Очищено")
 
 
-# ------- Кнопка -------
+# ===================== Кнопка =====================
 
 @router.callback_query(F.data.startswith("child:greet:btn:"))
 async def greet_btn_root(cb: CallbackQuery, tenant: dict):
@@ -325,7 +383,7 @@ async def greet_btn_clear(cb: CallbackQuery, tenant: dict):
     await cb.answer("Кнопка убрана")
 
 
-# ------- Авто-аппрув + DM -------
+# ===================== Авто-аппрув + DM =====================
 
 @router.chat_join_request()
 async def on_join_request(evt: ChatJoinRequest, bot: Bot, tenant: dict):
