@@ -1,20 +1,19 @@
 # app/bots/middlewares/tenant_ctx.py
-from typing import Any, Awaitable, Callable, Dict
 from aiogram import BaseMiddleware
+from typing import Callable, Any, Awaitable, Dict
 
 class TenantContext(BaseMiddleware):
     """
-    Кладёт dict tenant в data для любых событий (message, callback_query и т.д.).
-    Раньше тут ждали callable; теперь принимаем готовый dict.
+    Кладём в data["tenant"] объект, который заранее положили в bot._tenant.
+    Работает для message/callback_query/chat_join_request/chat_member и т.д.
     """
-    def __init__(self, tenant: Dict[str, Any]):
-        self.tenant = tenant
-
     async def __call__(
         self,
         handler: Callable[[Dict[str, Any], Any], Awaitable[Any]],
         event: Any,
-        data: Dict[str, Any],
+        data: Dict[str, Any]
     ) -> Any:
-        data["tenant"] = self.tenant
+        tenant = getattr(getattr(event, "bot", None), "_tenant", None)
+        if tenant:
+            data["tenant"] = tenant
         return await handler(event, data)
