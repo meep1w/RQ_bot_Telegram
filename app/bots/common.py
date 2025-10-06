@@ -74,23 +74,24 @@ def channels_list_kb(items: List[Dict[str, Any]], page: int = 1) -> InlineKeyboa
 # ====== Редактор приветствия/прощания ======
 
 def greet_editor_kb(kind: str) -> InlineKeyboardMarkup:
-    # kind: "hello" | "bye"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="✏️ Текст", callback_data=f"child:greet:edit:text:{kind}"),
-            InlineKeyboardButton(text="🖼 Фото",  callback_data=f"child:greet:set:photo:{kind}"),
+            InlineKeyboardButton(text="✍️ Текст", callback_data=f"child:greet:edit:text:{kind}"),
+            InlineKeyboardButton(text="🖼 Фото", callback_data=f"child:greet:set:photo:{kind}"),
         ],
         [
-            InlineKeyboardButton(text="🎞 Видео",   callback_data=f"child:greet:set:video:{kind}"),
-            InlineKeyboardButton(text="🟠 Кружок",  callback_data=f"child:greet:set:videonote:{kind}"),
+            InlineKeyboardButton(text="🎬 Видео", callback_data=f"child:greet:set:video:{kind}"),
+            InlineKeyboardButton(text="🟠 Кружок", callback_data=f"child:greet:set:videonote:{kind}"),
         ],
+        # ВАЖНО: строго `clear_media`
         [InlineKeyboardButton(text="🧹 Очистить медиа", callback_data=f"child:greet:clear_media:{kind}")],
         [InlineKeyboardButton(text="🔘 Кнопка", callback_data=f"child:greet:btn:{kind}")],
         [
             InlineKeyboardButton(text="👁 Предпросмотр", callback_data=f"child:greet:preview:{kind}"),
-            InlineKeyboardButton(text="↩︎ Назад",        callback_data="child:back"),
+            InlineKeyboardButton(text="↩️ Назад", callback_data=f"child:greet:open:{kind}"),
         ],
     ])
+
 
 
 def greet_button_kb(kind: str) -> InlineKeyboardMarkup:

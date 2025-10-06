@@ -277,15 +277,14 @@ async def greet_set_videonote(cb: CallbackQuery, tenant: dict):
     await cb.answer()
 
 
-@router.callback_query(F.data.startswith("child:greet:clear_media:"))
+@router.callback_query(F.data.regexp(r"^child:greet:clear[_-]?media:(hello|bye)$"))
 async def greet_clear_media_cb(cb: CallbackQuery, tenant: dict):
     if cb.from_user.id != tenant["owner_user_id"]:
         return await cb.answer()
-    kind = cb.data.split(":")[-1]
+    kind = cb.match.group(1)  # hello | bye
     await clear_media(tenant["id"], kind)
     await _render_greet_editor(cb, tenant["id"], kind)
     await cb.answer("Очищено")
-
 
 # ===================== Кнопка =====================
 
