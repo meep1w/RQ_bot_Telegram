@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "multi-tenant-joinbot"
+version = "0.1.0"
+description = "GA + multi-tenant Telegram bots with auto-join and farewells (FastAPI + Aiogram v3 + Postgres, webhooks)"
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.30.0" }
+aiogram = "^3.13.1"
+python-dotenv = "^1.0.1"
+SQLAlchemy = "^2.0.35"
+asyncpg = "^0.29.0"
+httpx = "^0.27.2"
+pydantic = "^2.8.2"
+pydantic-settings = "^2.3.4"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8.0"
+isort = "^5.13.2"
+ruff = "^0.6.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
