@@ -400,9 +400,19 @@ async def on_join_request(evt: ChatJoinRequest, bot: Bot, tenant: dict):
 @router.chat_member()
 async def on_chat_member(evt: ChatMemberUpdated, bot: Bot, tenant: dict):
     try:
-        old = getattr(evt, "old_chat_member", None)
-        new = getattr(evt, "new_chat_member", None)
-        if old and new and getattr(old, "status", None) == "member" and getattr(new, "status", None) in {"left", "kicked"}:
-            await _send_greeting_dm(bot, evt.from_user.id, tenant["id"], "bye")
+        # Целевой пользователь (тот, кто изменил статус)
+        user_id = evt.new_chat_member.user.id
+
+        old_status = getattr(evt.old_chat_member, "status", None)
+        new_status = getattr(evt.new_chat_member, "status", None)
+
+        # Вход: был вне чата → стал участником
+        if old_status in {"left", "kicked", None} and new_status in {"member", "restricted"}:
+            await _send_greeting_dm(bot, user_id, tenant["id"], "hello")
+
+        # Выход: был участником → ушёл/кикнут
+        elif old_status in {"member", "restricted"} and new_status in {"left", "kicked"}:
+            await _send_greeting_dm(bot, user_id, tenant["id"], "bye")
+
     except Exception:
         pass
