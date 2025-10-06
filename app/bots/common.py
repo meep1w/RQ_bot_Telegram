@@ -1,7 +1,5 @@
 from typing import Any, Dict, List
-
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
 
 # ====== GA (главный бот) ======
 
@@ -17,13 +15,9 @@ def ga_main_kb() -> InlineKeyboardMarkup:
 
 def ga_clients_kb(items: List[Dict[str, Any]], page: int, has_prev: bool, has_next: bool) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-
-    # Строки-кнопки со списком клиентов
     for r in items:
         owner_label = f"@{r.get('owner_username') or r['owner_user_id']}"
         rows.append([InlineKeyboardButton(text=owner_label, callback_data=f"ga:tenant:{r['id']}:open:{page}")])
-
-    # Навигация
     nav: list[InlineKeyboardButton] = []
     if has_prev:
         nav.append(InlineKeyboardButton(text="⟵", callback_data=f"ga:clients:{page-1}"))
@@ -31,10 +25,7 @@ def ga_clients_kb(items: List[Dict[str, Any]], page: int, has_prev: bool, has_ne
     if has_next:
         nav.append(InlineKeyboardButton(text="⟶", callback_data=f"ga:clients:{page+1}"))
     rows.append(nav)
-
-    # Назад в меню
     rows.append([InlineKeyboardButton(text="↩︎ В меню", callback_data="ga:menu")])
-
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -51,8 +42,8 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📣 Чаты/Каналы", callback_data="child:chats")],
         [
-            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:greet:open:hello"),
-            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:greet:open:bye"),
+            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:hello"),
+            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:bye"),
         ],
         [
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="child:settings"),
@@ -62,10 +53,24 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     ])
 
 
+def channels_list_kb(items: List[Dict[str, Any]], page: int = 1) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if items:
+        for r in items:
+            label = f"{r.get('title') or r['chat_id']}"
+            rows.append([InlineKeyboardButton(text=label, callback_data=f"child:ch:{r['id']}")])
+            rows.append([InlineKeyboardButton(text="🗑 Удалить", callback_data=f"child:chdel:{r['id']}")])
+    else:
+        rows.append([InlineKeyboardButton(text="Нет подключённых", callback_data="noop")])
+    rows.append([InlineKeyboardButton(text="🔗 Подключить чат", callback_data="child:chadd")])
+    rows.append([InlineKeyboardButton(text="↩︎ В меню", callback_data="child:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# === Редактор приветствия/прощания ===
+
 def greet_editor_kb(kind: str) -> InlineKeyboardMarkup:
-    """
-    kind: 'hello' | 'bye'
-    """
+    # kind: 'hello' | 'bye'
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✏️ Текст", callback_data=f"child:greet:edit:text:{kind}"),
@@ -93,4 +98,3 @@ def greet_button_kb(kind: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="❌ Убрать кнопку", callback_data=f"child:greet:btn:clear:{kind}")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"child:greet:open:{kind}")],
     ])
-
