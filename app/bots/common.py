@@ -45,8 +45,8 @@ def child_admin_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📣 Чаты/Каналы", callback_data="child:chats")],
         [
-            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:hello"),
-            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:bye"),
+            InlineKeyboardButton(text="👋 Приветствие", callback_data="child:greet:open:hello"),
+            InlineKeyboardButton(text="🧹 Прощание",   callback_data="child:greet:open:bye"),
         ],
         [
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="child:settings"),
@@ -103,7 +103,7 @@ def greet_button_kb(kind: str) -> InlineKeyboardMarkup:
     ])
 
 
-# ====== Настройки (добавлено) ======
+# ====== Настройки ======
 
 def child_settings_kb(collect_enabled: bool) -> InlineKeyboardMarkup:
     flag = "✅" if collect_enabled else "❌"

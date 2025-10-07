@@ -15,7 +15,7 @@ from aiogram.enums import ParseMode
 from app.bots.common import (
     child_admin_kb, child_settings_kb,
 )
-from app.services.greetings_simple import get_greeting  # ВАЖНО: save_greeting не импортируем
+from app.services.greetings_simple import get_greeting   # НЕ импортируем save_greeting
 from app.services.settings_simple import get_collect_requests, toggle_collect_requests
 from app.services.pending import add_request, list_new, mark_approved, mark_failed
 
@@ -138,6 +138,21 @@ async def cb_child_home(cb: CallbackQuery, bot: Bot):
     await cb.answer()
 
 
+# ====== Чаты/Каналы (заглушка на сейчас) ======
+
+@router.callback_query(F.data == "child:chats")
+async def cb_child_chats(cb: CallbackQuery):
+    await cb.message.edit_text(
+        "📣 Чаты/Каналы\n\n"
+        "Список и подключение чатов добавим на следующем шаге.\n"
+        "Сейчас бот работает: ЛС при апруве / ЛС при выходе (если возможно).",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="↩︎ В меню", callback_data="child:home")]
+        ])
+    )
+    await cb.answer()
+
+
 # ====== Настройки ======
 
 @router.callback_query(F.data == "child:settings")
@@ -158,7 +173,6 @@ async def cb_child_settings(cb: CallbackQuery, bot: Bot):
 async def cb_child_collect_toggle(cb: CallbackQuery, bot: Bot):
     tenant_id = _tenant_id_from_bot(bot)
     new_value = await toggle_collect_requests(tenant_id)
-    # Обновим и текст, и клавиатуру
     await cb.message.edit_text(
         "⚙️ Настройки\n\n"
         "• Копить заявки — если включено, новые заявки НЕ апрувятся сразу, а попадают в очередь.\n"
@@ -184,7 +198,6 @@ async def cb_child_collect_run(cb: CallbackQuery, bot: Bot):
 
         try:
             await bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
-            # тихо пробуем ЛС
             delivered = await _send_dm_greeting(bot, user_id, tenant_id, kind="hello")
             await mark_approved(row_id, dm_ok=delivered, error=None)
             ok += 1
@@ -192,14 +205,13 @@ async def cb_child_collect_run(cb: CallbackQuery, bot: Bot):
             await mark_failed(row_id, error=str(e)[:300])
             fail += 1
 
-        # анти-флуд
         await asyncio.sleep(0.15)
 
     await cb.message.answer(f"Сбор завершён:\n✅ Одобрено: {ok}\n⚠️ Ошибок: {fail}")
     await cb.answer()
 
 
-# ====== Приветствие/Прощание — простая инфо-карточка ======
+# ====== Приветствие/Прощание — инфо-карточка ======
 
 @router.callback_query(F.data.startswith("child:greet:"))
 async def cb_child_greet_menu(cb: CallbackQuery, bot: Bot):
@@ -237,34 +249,27 @@ async def on_chat_join_request(event: ChatJoinRequest, bot: Bot):
     chat_id = int(event.chat.id)
     user_id = int(event.from_user.id)
 
-    # проверяем режим
     collect = await get_collect_requests(tenant_id)
 
     if collect:
-        # копим заявку
         try:
             await add_request(tenant_id=tenant_id, chat_id=chat_id, user_id=user_id)
         except Exception:
             pass
-        # Ничего больше не делаем (ни ЛС, ни апрува)
         return
 
-    # иначе — автоапрув + тихая попытка ЛС
     try:
         await bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
     except Exception:
-        # если не получилось — молчим (не пишем в чаты), просто выходим
         return
 
-    # ЛС приветствие — тихая попытка
     await _send_dm_greeting(bot, user_id, tenant_id, kind="hello")
 
 
 @router.chat_member()
 async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot):
     """
-    Отправляем прощание в ЛС, когда пользователь выходит/кикается, если возможно.
-    НИЧЕГО в чаты/каналы не отправляем.
+    Отправляем прощание в ЛС при выходе/кике, если возможно. В чаты не пишем.
     """
     try:
         if event.old_chat_member and event.new_chat_member:
@@ -276,7 +281,6 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot):
         if str(old_status) in {"member"} and str(new_status) in {"left", "kicked"}:
             tenant_id = _tenant_id_from_bot(bot)
 
-            # Вычисляем ушедшего пользователя
             user_id = None
             if getattr(event, "from_user", None):
                 user_id = int(event.from_user.id)
@@ -285,7 +289,6 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot):
             if not user_id:
                 return
 
-            # Тихая попытка ЛС-прощания
             await _send_dm_greeting(bot, user_id, tenant_id, kind="bye")
 
     except Exception:
