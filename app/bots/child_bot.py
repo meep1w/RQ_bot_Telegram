@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional, Tuple, Dict
+from typing import Optional
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
@@ -15,7 +15,7 @@ from aiogram.enums import ParseMode
 from app.bots.common import (
     child_admin_kb, child_settings_kb,
 )
-from app.services.greetings_simple import get_greeting
+from app.services.greetings_simple import get_greeting  # ВАЖНО: save_greeting не импортируем
 from app.services.settings_simple import get_collect_requests, toggle_collect_requests
 from app.services.pending import add_request, list_new, mark_approved, mark_failed
 
@@ -120,8 +120,9 @@ async def child_admin_menu(msg: Message, bot: Bot):
     await msg.answer(
         "Админ-меню\n\n"
         "Здесь вы настраиваете бота: приветствие, прощание и управление заявками.\n"
-        "Бот НИКОГДА не пишет в чаты — только в ЛС (если возможно).",
-        reply_markup=child_admin_kb(collect_enabled=collect)
+        "Бот НИКОГДА не пишет в чаты — только в ЛС (если возможно).\n\n"
+        f"Сейчас: Копить заявки — {'ВКЛ' if collect else 'ВЫКЛ'}",
+        reply_markup=child_admin_kb()
     )
 
 
@@ -130,8 +131,9 @@ async def cb_child_home(cb: CallbackQuery, bot: Bot):
     tenant_id = _tenant_id_from_bot(bot)
     collect = await get_collect_requests(tenant_id)
     await cb.message.edit_text(
-        "Админ-меню",
-        reply_markup=child_admin_kb(collect_enabled=collect)
+        "Админ-меню\n\n"
+        f"Сейчас: Копить заявки — {'ВКЛ' if collect else 'ВЫКЛ'}",
+        reply_markup=child_admin_kb()
     )
     await cb.answer()
 
@@ -145,7 +147,8 @@ async def cb_child_settings(cb: CallbackQuery, bot: Bot):
     await cb.message.edit_text(
         "⚙️ Настройки\n\n"
         "• Копить заявки — если включено, новые заявки НЕ апрувятся сразу, а попадают в очередь.\n"
-        "• Собрать заявки — апрувит все накопленные заявки и тихо пробует отправить приветствие в ЛС.",
+        "• Собрать заявки — апрувит все накопленные заявки и тихо пробует отправить приветствие в ЛС.\n\n"
+        f"Сейчас: Копить заявки — {'ВКЛ' if collect else 'ВЫКЛ'}",
         reply_markup=child_settings_kb(collect_enabled=collect)
     )
     await cb.answer()
@@ -155,7 +158,14 @@ async def cb_child_settings(cb: CallbackQuery, bot: Bot):
 async def cb_child_collect_toggle(cb: CallbackQuery, bot: Bot):
     tenant_id = _tenant_id_from_bot(bot)
     new_value = await toggle_collect_requests(tenant_id)
-    await cb.message.edit_reply_markup(reply_markup=child_settings_kb(collect_enabled=new_value))
+    # Обновим и текст, и клавиатуру
+    await cb.message.edit_text(
+        "⚙️ Настройки\n\n"
+        "• Копить заявки — если включено, новые заявки НЕ апрувятся сразу, а попадают в очередь.\n"
+        "• Собрать заявки — апрувит все накопленные заявки и тихо пробует отправить приветствие в ЛС.\n\n"
+        f"Сейчас: Копить заявки — {'ВКЛ' if new_value else 'ВЫКЛ'}",
+        reply_markup=child_settings_kb(collect_enabled=new_value)
+    )
     await cb.answer("Режим обновлён")
 
 
@@ -189,8 +199,7 @@ async def cb_child_collect_run(cb: CallbackQuery, bot: Bot):
     await cb.answer()
 
 
-# ====== Приветствие/Прощание — редактор (простая заглушка текста) ======
-# У тебя уже есть полноценные редакторы, ниже — только "быстрые" заглушки — можно оставить или интегрировать с твоими.
+# ====== Приветствие/Прощание — простая инфо-карточка ======
 
 @router.callback_query(F.data.startswith("child:greet:"))
 async def cb_child_greet_menu(cb: CallbackQuery, bot: Bot):
@@ -214,7 +223,7 @@ async def cb_child_greet_menu(cb: CallbackQuery, bot: Bot):
         lines.append("Не настроено.")
 
     lines.append("")
-    lines.append("Изменение медиа/кнопок — в расширенном редакторе (будет в следующих шагах).")
+    lines.append("Изменение медиа/кнопок — в расширенном редакторе (следующий шаг).")
 
     await cb.message.edit_text("\n".join(lines))
     await cb.answer()
@@ -236,7 +245,6 @@ async def on_chat_join_request(event: ChatJoinRequest, bot: Bot):
         try:
             await add_request(tenant_id=tenant_id, chat_id=chat_id, user_id=user_id)
         except Exception:
-            # Не ломаем поток
             pass
         # Ничего больше не делаем (ни ЛС, ни апрува)
         return
@@ -259,19 +267,20 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot):
     НИЧЕГО в чаты/каналы не отправляем.
     """
     try:
-        # Нас интересует уход обычного участника
         if event.old_chat_member and event.new_chat_member:
             old_status = getattr(event.old_chat_member, "status", None)
             new_status = getattr(event.new_chat_member, "status", None)
         else:
             return
 
-        # Был member → стал left/kicked
         if str(old_status) in {"member"} and str(new_status) in {"left", "kicked"}:
             tenant_id = _tenant_id_from_bot(bot)
-            user_id = int(event.from_user.id) if event.from_user else None
-            # На некоторых типах апдейтов нужный id — в new_chat_member.user.id
-            if not user_id and hasattr(event, "new_chat_member") and getattr(event.new_chat_member, "user", None):
+
+            # Вычисляем ушедшего пользователя
+            user_id = None
+            if getattr(event, "from_user", None):
+                user_id = int(event.from_user.id)
+            if not user_id and getattr(event, "new_chat_member", None) and getattr(event.new_chat_member, "user", None):
                 user_id = int(event.new_chat_member.user.id)
             if not user_id:
                 return
@@ -280,5 +289,4 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot):
             await _send_dm_greeting(bot, user_id, tenant_id, kind="bye")
 
     except Exception:
-        # Любые ошибки — молча игнорим (не пишем в чаты)
         return
