@@ -15,7 +15,7 @@ from aiogram.enums import ParseMode
 from app.bots.common import (
     child_admin_kb, child_settings_kb,
 )
-from app.services.greetings_simple import get_greeting, save_greeting  # у тебя уже есть этот модуль
+from app.services.greetings_simple import get_greeting
 from app.services.settings_simple import get_collect_requests, toggle_collect_requests
 from app.services.pending import add_request, list_new, mark_approved, mark_failed
 
